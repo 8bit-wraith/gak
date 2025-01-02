@@ -3,7 +3,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import { readFileSync, statSync } from 'fs';
-import { join, relative, sep } from 'path';
+import { join, relative, sep, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { globbySync } from 'globby';
 import isTextPath from 'is-text-path';
@@ -401,7 +401,7 @@ async function search(options) {
 				}
 
 				// Update current directory for verbose output
-				const dir = path.dirname(file);
+				const dir = dirname(file);
 				if (dir !== stats.currentDir) {
 					stats.currentDir = dir;
 					debug(`Searching in: ${displayPath(dir)}`);
