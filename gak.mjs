@@ -64,6 +64,9 @@ function normalizePath(path) {
 const defaultIgnorePatterns = [
 	'**/node_modules/**',
 	'**/.git/**',
+	'**/.Trash/**',      // Skip macOS Trash
+	'**/$Recycle.Bin/**', // Skip Windows Recycle Bin
+	'**/lost+found/**',   // Skip Linux lost+found
 	...(isWindows ? [
 		'**/System Volume Information/**',
 		'**/Windows/**',
@@ -193,7 +196,8 @@ async function search(options) {
 		filesSkipped: {
 			size: 0,
 			binary: 0,
-			error: 0
+			error: 0,
+			permission: 0
 		}
 	};
 
@@ -347,7 +351,10 @@ async function search(options) {
 			cwd: options.path,
 			absolute: true,
 			ignore: options.ignore,
-			dot: true
+			dot: true,
+			onlyFiles: true,
+			followSymbolicLinks: false,  // Don't follow symlinks to avoid permission issues
+			suppressErrors: true         // Skip directories we can't read
 		});
 		debug('Debug - Found files:', files);
 
@@ -355,12 +362,12 @@ async function search(options) {
 			try {
 				// Check if we can access the file first
 				try {
-						await fs.access(file, fs.constants.R_OK);
+					await fs.access(file, fs.constants.R_OK);
 				} catch (error) {
 					if (error.code === 'EACCES' || error.code === 'EPERM') {
-						stats.filesSkipped.error++;
+						stats.filesSkipped.permission++;
 						if (options.showSkips) {
-							console.error(dim(`Skipping ${file}: Permission denied`));
+							debug(`Skipping ${file}: Permission denied`);
 						}
 						continue;
 					}
@@ -373,7 +380,7 @@ async function search(options) {
 				if (stat.isDirectory()) {
 					stats.filesSkipped.error++;
 					if (options.showSkips) {
-						console.error(dim(`Skipping directory: ${file}`));
+						debug(`Skipping directory: ${file}`);
 					}
 					continue;
 				}
@@ -382,7 +389,7 @@ async function search(options) {
 				if (stat.size > bytes) {
 					stats.filesSkipped.size++;
 					if (options.showSkips) {
-						console.error(dim(`Skipping large file: ${file} (${prettyBytes(stat.size)})`));
+						debug(`Skipping large file: ${file} (${prettyBytes(stat.size)})`);
 					}
 					continue;
 				}
@@ -391,7 +398,7 @@ async function search(options) {
 				if (!options.binary && !isTextPath(file)) {
 					stats.filesSkipped.binary++;
 					if (options.showSkips) {
-						console.error(dim(`Skipping binary file: ${file}`));
+						debug(`Skipping binary file: ${file}`);
 					}
 					continue;
 				}
@@ -404,13 +411,13 @@ async function search(options) {
 				}
 			} catch (error) {
 				stats.filesSkipped.error++;
-				if (!options.quiet) {
+				if (options.showSkips) {
 					if (error.code === 'ENOENT') {
-						console.error(dim(`File not found: ${displayPath(file)}`));
+						debug(`File not found: ${displayPath(file)}`);
 					} else if (error.code === 'EISDIR') {
-						console.error(dim(`Skipping directory: ${displayPath(file)}`));
+						debug(`Skipping directory: ${displayPath(file)}`);
 					} else {
-						console.error(dim(`Error processing ${displayPath(file)}: ${error.message}`));
+						debug(`Error processing ${displayPath(file)}: ${error.message}`);
 					}
 				}
 				continue;
@@ -430,11 +437,12 @@ async function search(options) {
 			console.log('  ⚠️  Files skipped:');
 			console.log(`    📏 Size limit: ${stats.filesSkipped.size}`);
 			console.log(`    💾 Binary files: ${stats.filesSkipped.binary}`);
-			console.log(`    ❌ Read errors: ${stats.filesSkipped.error}`);
+			console.log(`    🔒 Permission denied: ${stats.filesSkipped.permission}`);
+			console.log(`    ❌ Other errors: ${stats.filesSkipped.error}`);
 		}
 	} catch (error) {
 		spinner.fail(red(`Error: ${error.message}`));
-		process.exit(1);
+			process.exit(1);
 	} finally {
 		if (updateSpinner) clearInterval(updateSpinner);
 		spinner.stop();
