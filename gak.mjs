@@ -191,7 +191,7 @@ function getProgressBar(current, total, width = 20) {
 }
 
 // Main search function
-async function search(options) {
+async function search(options, keywords) {
 	const spinner = ora({
 		text: getLoadingMessage(),
 		spinner: 'dots12',
@@ -216,25 +216,25 @@ async function search(options) {
 	let updateSpinner;
 
 	try {
-		// Convert pattern to RegExp safely, escaping special chars if it's not already a regex
-		const isRegex = options.pattern.startsWith('/') && options.pattern.endsWith('/');
-		const searchPattern = isRegex ?
-			options.pattern.slice(1, -1) : // Remove the slashes for actual regex
-			options.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
+		// Convert keywords to RegExp safely, escaping special chars if they're not already regexes
+		const searchPatterns = keywords.map(keyword => {
+			const isRegex = keyword.startsWith('/') && keyword.endsWith('/');
+			return isRegex ?
+				keyword.slice(1, -1) : // Remove the slashes for actual regex
+				keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
+		});
 
-		const keywords = new Set([searchPattern]);
-		debug('Search pattern:', searchPattern);
-		debug('Keywords:', Array.from(keywords));
+		debug('Search patterns:', searchPatterns);
 
 		// Get files matching patterns and count
 		const allFiles = globbySync(patterns, {
 			cwd: options.path,
 			absolute: true,
-				ignore: options.ignore,
-				dot: true,
-				onlyFiles: true,
-				followSymbolicLinks: false,
-				suppressErrors: true
+			ignore: options.ignore,
+			dot: true,
+			onlyFiles: true,
+			followSymbolicLinks: false,
+			suppressErrors: true
 		});
 		stats.totalFiles = allFiles.length;
 		debug('Debug - Total files to search:', stats.totalFiles);
@@ -250,28 +250,28 @@ async function search(options) {
 		let foundMatches = false;
 
 		// Helper function for searching file contents
-		function searchAndDisplayContext(filePath, keywords) {
+		function searchAndDisplayContext(filePath, patterns) {
 			try {
 				const content = readFileSync(filePath, 'utf-8');
 				debug(`Reading file: ${filePath}`);
-				debug(`Content: ${content}`);
-				debug(`Keywords: ${Array.from(keywords)}`);
+				debug(`Content length: ${content.length}`);
+				debug(`Patterns: ${patterns}`);
 				
 				const lines = content.split('\n');
 				const matches = new Map();
 
-				// Find matches for all keywords
-				keywords.forEach(keyword => {
-					const searchRegex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+				// Find matches for all patterns
+				patterns.forEach(pattern => {
+					const searchRegex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
 					debug(`Using regex: ${searchRegex}`);
 					lines.forEach((line, index) => {
 						debug(`Checking line ${index + 1}: ${line}`);
 						if (searchRegex.test(line)) {
 							debug(`Found match in line ${index + 1}`);
 							if (!matches.has(index)) {
-								matches.set(index, { line, keywords: new Set() });
+								matches.set(index, { line, patterns: new Set() });
 							}
-							matches.get(index).keywords.add(keyword);
+							matches.get(index).patterns.add(pattern);
 						}
 					});
 				});
@@ -299,8 +299,8 @@ async function search(options) {
 
 						// Highlight the matching line
 						let highlightedLine = match.line;
-						match.keywords.forEach(keyword => {
-							const regex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+						match.patterns.forEach(pattern => {
+							const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
 							highlightedLine = highlightedLine.replace(regex, yellow('$&'));
 						});
 
@@ -312,7 +312,7 @@ async function search(options) {
 
 						if (charsBefore > 0 || charsAfter > 0) {
 							// Character-based context
-							const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.keywords).join('|'), options.caseSensitive ? 'g' : 'gi'))];
+							const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.patterns).join('|'), options.caseSensitive ? 'g' : 'gi'))];
 							for (const [matchIndex, m] of matches.entries()) {
 								// Convert string indices to array indices for proper character handling
 								const lineChars = [...highlightedLine];
@@ -327,20 +327,6 @@ async function search(options) {
 								const beforeContext = lineChars.slice(contextStart, matchStartIdx).join('');
 								const matchedText = lineChars.slice(matchStartIdx, matchEndIdx).join('');
 								const afterContext = lineChars.slice(matchEndIdx, contextEnd).join('');
-
-							// Truncate long lines for better readability
-							const maxLineLength = process.stdout.columns || 120;
-							const truncateLength = Math.floor((maxLineLength - 30) / 2); // Leave more room for line numbers, match index, and char index
-
-							const truncateLine = (text) => {
-								if (text.length <= truncateLength) return text;
-								return text.slice(0, truncateLength) + '...';
-							};
-
-							const truncatedBefore = truncateLine(beforeContext);
-							const truncatedMatch = matchedText.length > truncateLength ?
-								matchedText.slice(0, truncateLength) + '...' : matchedText;
-							const truncatedAfter = truncateLine(afterContext);
 
 								// Format: [line@char] content
 								console.log(
@@ -388,16 +374,7 @@ async function search(options) {
 			return false;
 		}
 
-		// Get files matching patterns
-		const files = globbySync(patterns, {
-			cwd: options.path,
-			absolute: true,
-			ignore: options.ignore,
-			dot: true
-		});
-		console.error('Debug - Found files:', files);
-
-		for (const file of files) {
+		for (const file of allFiles) {
 			try {
 				// Check if we can access the file first
 				try {
@@ -451,8 +428,8 @@ async function search(options) {
 
 				stats.filesSearched++;
 
-				// Search for all keywords in the file
-				if (searchAndDisplayContext(file, keywords)) {
+				// Search for all patterns in the file
+				if (searchAndDisplayContext(file, searchPatterns)) {
 					foundMatches = true;
 				}
 			} catch (error) {
@@ -499,24 +476,9 @@ async function search(options) {
 // Run the search
 const start = performance.now();
 search({
-	pattern: keywords.join(' '),
-	caseSensitive: options.caseSensitive,
-	charsBefore: options.contextBefore || options.context || 0,
-	charsAfter: options.contextAfter || options.context || 0,
-	fileTypes: options.type,
-	path: options.path,
-	binary: options.binary,
-	ignore: options.ignore,
-	maxMatches: options.maxMatches,
-	quiet: options.quiet,
-	stats: options.stats,
-	contextBefore: options.contextBefore,
-	contextAfter: options.contextAfter,
-	context: options.context,
-	linesBefore: options.linesBefore,
-	linesAfter: options.linesAfter,
-	lines: options.lines,
-}).then(() => {
+	...options,
+	pattern: keywords.join(' ')
+}, keywords).then(() => {
 	if (!options.quiet && !options.json) {
 		const end = performance.now();
 		console.log(dim(`\nSearch completed in ${(end - start).toFixed(2)}ms`));
