@@ -80,7 +80,7 @@ program
 	.option('-p, --path <path>', 'Search path', '.')
 	.option('-b, --binary', 'Include binary files', false)
 	.option('-i, --ignore <patterns...>', 'Glob patterns to ignore', defaultIgnorePatterns)
-	.option('-t, --type <extensions...>', 'File extensions to search (e.g., js,py,txt)', [])
+	.option('-t, --type <types>', 'File extensions to search (e.g., js,py,txt)', '')
 	.option('-c, --context <chars>', 'Number of characters to show around match', 0)
 	.option('-cb, --context-before <chars>', 'Number of characters to show before match', 0)
 	.option('-ca, --context-after <chars>', 'Number of characters to show after match', 0)
@@ -131,12 +131,18 @@ const bytes = parseInt(sizeLimit[1]) * (sizeLimit[2] ? multipliers[sizeLimit[2].
 
 // Build glob patterns based on file extensions
 let patterns = ['**/*'];
-if (options.type && options.type.length) {
+if (options.type) {
 	// Split comma-separated extensions and handle both formats (.js and js)
-	const extensions = options.type.toString().split(',')
+	const extensions = options.type.split(',')
+		.filter(ext => ext.trim())  // Remove empty entries
 		.map(ext => ext.trim())
 		.map(ext => ext.startsWith('.') ? ext.slice(1) : ext);
-	patterns = extensions.map(ext => `**/*.${ext}`);
+	
+	if (extensions.length > 0) {
+		patterns = extensions.map(ext => `**/*.${ext}`);
+		console.error('Debug - File patterns:', patterns);
+		console.error('Debug - Extensions:', extensions);
+	}
 }
 
 // Update file path display for current OS
@@ -328,19 +334,20 @@ async function search(options) {
 			return false;
 		}
 
-		// Search files
+		// Get files matching patterns
 		const files = globbySync(patterns, {
 			cwd: options.path,
 			absolute: true,
 			ignore: options.ignore,
 			dot: true
 		});
+		console.error('Debug - Found files:', files);
 
 		for (const file of files) {
 			try {
 				// Check if we can access the file first
 				try {
-					await fs.access(file, fs.constants.R_OK);
+						await fs.access(file, fs.constants.R_OK);
 				} catch (error) {
 					if (error.code === 'EACCES' || error.code === 'EPERM') {
 						stats.filesSkipped.error++;
