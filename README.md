@@ -17,9 +17,43 @@ A powerful command-line tool for searching files with multiple keywords, offerin
 
 ## Installation
 
+Choose your preferred installation method:
+
+### NPM (All Platforms)
 ```bash
 npm install -g gak
 ```
+
+### Homebrew (macOS)
+```bash
+brew tap 8bit-wraith/gak
+brew install gak
+```
+
+### APT (Debian/Ubuntu)
+```bash
+# Add our PPA
+curl -s https://gak.8b.is/key.gpg | sudo apt-key add -
+echo "deb https://gak.8b.is/apt stable main" | sudo tee /etc/apt/sources.list.d/gak.list
+
+# Install GAK
+sudo apt update
+sudo apt install gak
+```
+
+### Manual Installation
+```bash
+git clone https://github.com/8bit-wraith/gak.git
+cd gak
+npm install -g .
+```
+
+### Windows Notes
+- GAK works seamlessly on Windows with automatic path handling
+- Windows-specific directories (Program Files, System32, etc.) are automatically ignored
+- Windows batch (.bat) and PowerShell (.ps1) files are recognized with special icons
+- Use PowerShell or Command Prompt to run GAK commands
+- Forward slashes (/) in paths work in addition to backslashes (\)
 
 ## Usage
 

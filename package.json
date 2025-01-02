@@ -8,14 +8,24 @@
   },
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublishOnly": "chmod +x gak.mjs",
+    "postinstall": "node -e \"if (process.platform !== 'win32') { const {chmod} = require('fs'); chmod('gak.mjs', '755', ()=>{}); }\""
   },
   "keywords": [
     "search",
     "grep",
     "find",
     "keywords",
-    "cli"
+    "cli",
+    "search-tool",
+    "file-search",
+    "code-search",
+    "text-search",
+    "multi-keyword",
+    "windows",
+    "linux",
+    "macos"
   ],
   "author": "8bit-Wraith <gak@8b.is>",
   "license": "MIT",
@@ -32,6 +42,17 @@
     "commander": "^11.1.0",
     "globby": "^14.0.0",
     "is-text-path": "^2.0.0",
-    "pretty-bytes": "^6.1.1"
-  }
+    "pretty-bytes": "^6.1.1",
+    "ora": "^7.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "preferGlobal": true,
+  "files": [
+    "gak.mjs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ]
 } 

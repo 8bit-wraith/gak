@@ -3,14 +3,16 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import { readFileSync, statSync } from 'fs';
-import { join, relative } from 'path';
+import { join, relative, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { globbySync } from 'globby';
 import isTextPath from 'is-text-path';
 import prettyBytes from 'pretty-bytes';
 import fs from 'fs/promises';
+import ora from 'ora';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const isWindows = process.platform === 'win32';
 
 // ANSI color shortcuts
 const dim = chalk.dim;
@@ -41,6 +43,8 @@ const FILE_TYPE_EMOJIS = {
 	yaml: '⚙️', // YAML
 	sh: '🐚', // Shell
 	bash: '🐚', // Bash
+	bat: '🪟', // Windows Batch
+	ps1: '🪟', // PowerShell
 	txt: '📄', // Text
 	default: '📂' // Default
 };
@@ -51,13 +55,31 @@ function getFileEmoji(filePath) {
 	return FILE_TYPE_EMOJIS[ext] || FILE_TYPE_EMOJIS.default;
 }
 
+// Normalize path for current OS
+function normalizePath(path) {
+	return isWindows ? path.replace(/\//g, '\\') : path;
+}
+
+// Default ignore patterns for different OS
+const defaultIgnorePatterns = [
+	'**/node_modules/**',
+	'**/.git/**',
+	...(isWindows ? [
+		'**/System Volume Information/**',
+		'**/Windows/**',
+		'**/Program Files/**',
+		'**/Program Files (x86)/**',
+		'**/ProgramData/**'
+	] : [])
+];
+
 program
 	.name('gak')
 	.description('Global Awesome Keywords - Search files for multiple keywords')
 	.argument('[keywords...]', 'Keywords to search for')
 	.option('-p, --path <path>', 'Search path', '.')
 	.option('-b, --binary', 'Include binary files', false)
-	.option('-i, --ignore <patterns...>', 'Glob patterns to ignore', ['**/node_modules/**', '**/.git/**'])
+	.option('-i, --ignore <patterns...>', 'Glob patterns to ignore', defaultIgnorePatterns)
 	.option('-t, --type <extensions...>', 'File extensions to search (e.g., js,py,txt)', [])
 	.option('-c, --context <chars>', 'Number of characters to show around match', 0)
 	.option('-cb, --context-before <chars>', 'Number of characters to show before match', 0)
@@ -114,34 +136,58 @@ if (options.type.length) {
 	patterns = extensions.map(ext => `**/*${ext}`);
 }
 
+// Update file path display for current OS
+function displayPath(filePath) {
+	const relativePath = relative(process.cwd(), filePath);
+	return isWindows ? relativePath.replace(/\\/g, '/') : relativePath;
+}
+
+// Fun loading messages
+const loadingMessages = [
+	"🔍 Searching like Sherlock...",
+	"🚀 Zooming through files...",
+	"🧙‍♂️ Casting search spells...",
+	"🎯 Hunting for matches...",
+	"🎨 Painting your results...",
+	"🌈 Following the rainbow of code...",
+	"🔮 Gazing into the codebase...",
+	"🎭 Performing regex magic...",
+	"🎪 Juggling through directories...",
+	"🎡 Spinning through files..."
+];
+
+// Get random loading message
+function getLoadingMessage() {
+	return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+}
+
 // Main search function
 async function search(options) {
-	const {
-		pattern,
-		caseSensitive = false,
-		charsBefore = 0,
-		charsAfter = 0,
-		fileTypes = null,
-	} = options;
+	const spinner = ora({
+		text: getLoadingMessage(),
+		spinner: 'dots12',
+		color: 'cyan'
+	}).start();
+
+	const stats = {
+		startTime: Date.now(),
+		filesSearched: 0,
+		matchesFound: 0,
+		filesSkipped: {
+			size: 0,
+			binary: 0,
+			error: 0
+		}
+	};
 
 	try {
 		// Convert pattern to RegExp safely, escaping special chars if it's not already a regex
-		const isRegex = pattern.startsWith('/') && pattern.endsWith('/');
+		const isRegex = options.pattern.startsWith('/') && options.pattern.endsWith('/');
 		const searchPattern = isRegex ?
-			pattern.slice(1, -1) : // Remove the slashes for actual regex
-			pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
+			options.pattern.slice(1, -1) : // Remove the slashes for actual regex
+			options.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
 
 		const keywords = new Set([searchPattern]);
-
-		const stats = {
-			filesSearched: 0,
-			matchesFound: 0,
-			filesSkipped: {
-				size: 0,
-				binary: 0,
-				error: 0
-			}
-		};
 
 		let foundMatches = false;
 
@@ -152,7 +198,7 @@ async function search(options) {
 
 			// Find matches for all keywords
 			keywords.forEach(keyword => {
-				const searchRegex = caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+				const searchRegex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
 				lines.forEach((line, index) => {
 					if (searchRegex.test(line)) {
 						if (!matches.has(index)) {
@@ -165,9 +211,9 @@ async function search(options) {
 
 			if (matches.size > 0) {
 				if (!options.quiet) {
-					// Show file name with appropriate emoji
+					// Show file name with appropriate emoji and normalized path
 					const emoji = getFileEmoji(filePath);
-					console.log(`\n${emoji} ${blue(relative(process.cwd(), filePath))}`);
+					console.log(`\n${emoji} ${blue(displayPath(filePath))}`);
 				}
 
 				let matchCount = 0;
@@ -186,7 +232,7 @@ async function search(options) {
 					// Highlight the matching line
 					let highlightedLine = match.line;
 					match.keywords.forEach(keyword => {
-						const regex = caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+						const regex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
 						highlightedLine = highlightedLine.replace(regex, yellow('$&'));
 					});
 
@@ -198,7 +244,7 @@ async function search(options) {
 
 					if (charsBefore > 0 || charsAfter > 0) {
 						// Character-based context
-						const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.keywords).join('|'), caseSensitive ? 'g' : 'gi'))];
+						const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.keywords).join('|'), options.caseSensitive ? 'g' : 'gi'))];
 						for (const [matchIndex, m] of matches.entries()) {
 							// Convert string indices to array indices for proper character handling
 							const lineChars = [...highlightedLine];
@@ -334,35 +380,43 @@ async function search(options) {
 				stats.filesSkipped.error++;
 				if (!options.quiet) {
 					if (error.code === 'ENOENT') {
-						console.error(dim(`File not found: ${file}`));
+						console.error(dim(`File not found: ${displayPath(file)}`));
 					} else if (error.code === 'EISDIR') {
-						console.error(dim(`Skipping directory: ${file}`));
+						console.error(dim(`Skipping directory: ${displayPath(file)}`));
 					} else {
-						console.error(dim(`Error processing ${file}: ${error.message}`));
+						console.error(dim(`Error processing ${displayPath(file)}: ${error.message}`));
 					}
 				}
 				continue;
 			}
 		}
 
+		// Update spinner periodically with progress
+		const updateSpinner = setInterval(() => {
+			spinner.text = `${getLoadingMessage()} (${stats.filesSearched} files searched)`;
+		}, 2000);
+
 		if (!foundMatches) {
-			console.log(red('\nNo matches found.'));
+			console.log(red('\nNo matches found. Maybe try a different search term? 🤔'));
 		}
 
 		if (options.stats) {
 			const duration = ((Date.now() - stats.startTime) / 1000).toFixed(2);
-			console.log('\nSearch Statistics:');
-			console.log(`  Time: ${duration}s`);
-			console.log(`  Files searched: ${stats.filesSearched}`);
-			console.log(`  Files with matches: ${stats.matchesFound}`);
-			console.log('  Files skipped:');
-			console.log(`    Size limit: ${stats.filesSkipped.size}`);
-			console.log(`    Binary files: ${stats.filesSkipped.binary}`);
-			console.log(`    Read errors: ${stats.filesSkipped.error}`);
+			console.log('\n📊 Search Statistics:');
+			console.log(`  ⏱️  Time: ${duration}s`);
+			console.log(`  📂 Files searched: ${stats.filesSearched}`);
+			console.log(`  ✨ Files with matches: ${stats.matchesFound}`);
+			console.log('  ⚠️  Files skipped:');
+			console.log(`    📏 Size limit: ${stats.filesSkipped.size}`);
+			console.log(`    💾 Binary files: ${stats.filesSkipped.binary}`);
+			console.log(`    ❌ Read errors: ${stats.filesSkipped.error}`);
 		}
 	} catch (error) {
-		console.error(red(`Error: ${error.message}`));
+		spinner.fail(red(`Error: ${error.message}`));
 		process.exit(1);
+	} finally {
+		clearInterval(updateSpinner);
+		spinner.stop();
 	}
 }
 

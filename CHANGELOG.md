@@ -13,6 +13,9 @@ All notable changes to GAK will be documented in this file.
 - Performance optimizations for large codebases
 - Added comparison section with grep in README
 - Homebrew and APT package configurations
+- Full Windows support with automatic path handling 🪟
+- Windows-specific file type icons (.bat, .ps1)
+- Smart Windows system directory exclusions
 
 ### Technical Details
 - Built with Node.js for maximum performance
@@ -20,9 +23,12 @@ All notable changes to GAK will be documented in this file.
 - Smart file handling with binary detection
 - Efficient memory usage patterns
 - Colorful terminal output with chalk
+- Cross-platform path normalization
+- Windows-compatible file operations
 
 ### Notes
 - Trisha from Accounting says this is "absolutely amazing!" 🌟
 - Remember: GAK is your friend in the terminal! 🤝
+- Works great on Windows too! Bill G. would be proud! 💻
 
 [1.0.0]: https://github.com/8bit-wraith/gak/releases/tag/v1.0.0 
