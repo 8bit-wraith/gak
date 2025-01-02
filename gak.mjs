@@ -266,7 +266,9 @@ async function search(options, keywords) {
 					debug(`Using regex: ${searchRegex}`);
 					lines.forEach((line, index) => {
 						debug(`Checking line ${index + 1}: ${line}`);
-						if (searchRegex.test(line)) {
+						const matched = searchRegex.test(line);
+						debug(`Line ${index + 1} matched: ${matched}`);
+						if (matched) {
 							debug(`Found match in line ${index + 1}`);
 							if (!matches.has(index)) {
 								matches.set(index, { line, patterns: new Set() });
@@ -304,42 +306,17 @@ async function search(options, keywords) {
 							highlightedLine = highlightedLine.replace(regex, yellow('$&'));
 						});
 
+						// Just show the matching line by default
+						console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
+
 						// Get context sizes
 						const charsBefore = options.contextBefore || options.context || 0;
 						const charsAfter = options.contextAfter || options.context || 0;
 						const linesBefore = options.linesBefore || options.lines || 0;
 						const linesAfter = options.linesAfter || options.lines || 0;
 
-						if (charsBefore > 0 || charsAfter > 0) {
-							// Character-based context
-							const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.patterns).join('|'), options.caseSensitive ? 'g' : 'gi'))];
-							for (const [matchIndex, m] of matches.entries()) {
-								// Convert string indices to array indices for proper character handling
-								const lineChars = [...highlightedLine];
-								const matchStartIdx = [...highlightedLine.slice(0, m.index)].length;
-								const matchEndIdx = matchStartIdx + [...m[0]].length;
-
-								// Calculate context boundaries
-								const contextStart = Math.max(0, matchStartIdx - charsBefore);
-								const contextEnd = Math.min(lineChars.length, matchEndIdx + charsAfter);
-
-								// Extract and join the context parts
-								const beforeContext = lineChars.slice(contextStart, matchStartIdx).join('');
-								const matchedText = lineChars.slice(matchStartIdx, matchEndIdx).join('');
-								const afterContext = lineChars.slice(matchEndIdx, contextEnd).join('');
-
-								// Format: [line@char] content
-								console.log(
-									green(`${lineNum + 1}`) + dim('@') +
-									blue(`${m.index}`) + ' ' +
-									(contextStart > 0 ? '...' : '') +
-									dim(beforeContext) +
-									yellow(matchedText) +
-									dim(afterContext) +
-									(contextEnd < lineChars.length ? '...' : '')
-								);
-							}
-						} else if (linesBefore > 0 || linesAfter > 0) {
+						// Show additional context if requested
+						if (linesBefore > 0 || linesAfter > 0) {
 							// Line-based context
 							const contextBefore = Math.max(0, lineNum - linesBefore);
 							const contextAfter = Math.min(lines.length, lineNum + linesAfter + 1);
@@ -349,16 +326,10 @@ async function search(options, keywords) {
 								console.log(dim(`${i + 1}: ${lines[i]}`));
 							}
 
-							// Print the matching line
-							console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
-
 							// Print context lines after
 							for (let i = lineNum + 1; i < contextAfter; i++) {
 								console.log(dim(`${i + 1}: ${lines[i]}`));
 							}
-						} else {
-							// Just show the matching line
-							console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
 						}
 
 						console.log(''); // Add spacing between matches
