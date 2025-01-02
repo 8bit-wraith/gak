@@ -1,0 +1,37 @@
+{
+  "name": "gak",
+  "version": "1.0.0",
+  "description": "Global Awesome Keywords - A powerful multi-keyword search tool",
+  "main": "gak.mjs",
+  "bin": {
+    "gak": "./gak.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "search",
+    "grep",
+    "find",
+    "keywords",
+    "cli"
+  ],
+  "author": "8bit-Wraith <gak@8b.is>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/8bit-wraith/gak.git"
+  },
+  "bugs": {
+    "url": "https://github.com/8bit-wraith/gak/issues"
+  },
+  "homepage": "https://github.com/8bit-wraith/gak#readme",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "globby": "^14.0.0",
+    "is-text-path": "^2.0.0",
+    "pretty-bytes": "^6.1.1"
+  }
+} 

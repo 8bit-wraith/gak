@@ -1,0 +1,21 @@
+Source: gak
+Section: utils
+Priority: optional
+Maintainer: 8bit-Wraith <gak@8b.is>
+Build-Depends: debhelper-compat (= 13), nodejs (>= 14.0.0), npm
+
+Package: gak
+Architecture: all
+Depends: nodejs (>= 14.0.0)
+Description: Global Awesome Keywords - A powerful multi-keyword search tool
+ GAK is a command-line tool for searching files with multiple keywords,
+ offering flexible context display and advanced filtering options.
+ .
+ Features include:
+  * Multi-keyword searching
+  * Recursive directory searching
+  * File type filtering
+  * Context-aware results
+  * Syntax highlighting
+  * Binary file filtering
+  * And more! 

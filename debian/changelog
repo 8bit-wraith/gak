@@ -1,0 +1,9 @@
+gak (1.0.0-1) unstable; urgency=medium
+
+  * Initial release
+  * Powerful multi-keyword search functionality
+  * Advanced context display options
+  * File type filtering and binary file handling
+  * Performance optimizations for large codebases
+
+ -- 8bit-Wraith <gak@8b.is>  Wed, 17 Jan 2025 12:00:00 +0000 
