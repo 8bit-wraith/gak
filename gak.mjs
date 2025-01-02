@@ -180,6 +180,9 @@ async function search(options) {
 		}
 	};
 
+	// Declare updateSpinner at the start
+	let updateSpinner;
+
 	try {
 		// Convert pattern to RegExp safely, escaping special chars if it's not already a regex
 		const isRegex = options.pattern.startsWith('/') && options.pattern.endsWith('/');
@@ -190,6 +193,11 @@ async function search(options) {
 		const keywords = new Set([searchPattern]);
 
 		let foundMatches = false;
+
+		// Start spinner updates
+		updateSpinner = setInterval(() => {
+			spinner.text = `${getLoadingMessage()} (${stats.filesSearched} files searched)`;
+		}, 2000);
 
 		function searchAndDisplayContext(filePath, keywords) {
 			const content = readFileSync(filePath, 'utf-8');
@@ -391,11 +399,6 @@ async function search(options) {
 			}
 		}
 
-		// Update spinner periodically with progress
-		const updateSpinner = setInterval(() => {
-			spinner.text = `${getLoadingMessage()} (${stats.filesSearched} files searched)`;
-		}, 2000);
-
 		if (!foundMatches) {
 			console.log(red('\nNo matches found. Maybe try a different search term? 🤔'));
 		}
@@ -415,7 +418,7 @@ async function search(options) {
 		spinner.fail(red(`Error: ${error.message}`));
 		process.exit(1);
 	} finally {
-		clearInterval(updateSpinner);
+		if (updateSpinner) clearInterval(updateSpinner);
 		spinner.stop();
 	}
 }
