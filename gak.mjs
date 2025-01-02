@@ -97,6 +97,7 @@ program
 	.option('--stats', 'Show search statistics', false)
 	.option('-ss, --show-skips', 'Show skipped files', false)
 	.option('-d, --debug', 'Show debug information', false)
+	.option('-v, --verbose', 'Show verbose progress information', false)
 	.version('1.0.0')
 	.showHelpAfterError();
 
@@ -181,6 +182,14 @@ function getLoadingMessage() {
 	return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 }
 
+// Progress bar helper
+function getProgressBar(current, total, width = 20) {
+	const progress = Math.min(current / total, 1);
+	const filled = Math.round(width * progress);
+	const empty = width - filled;
+	return `[${'█'.repeat(filled)}${' '.repeat(empty)}] ${Math.round(progress * 100)}%`;
+}
+
 // Main search function
 async function search(options) {
 	const spinner = ora({
@@ -193,6 +202,8 @@ async function search(options) {
 		startTime: Date.now(),
 		filesSearched: 0,
 		matchesFound: 0,
+		currentDir: '',
+		totalFiles: 0,
 		filesSkipped: {
 			size: 0,
 			binary: 0,
@@ -213,13 +224,29 @@ async function search(options) {
 
 		const keywords = new Set([searchPattern]);
 
+		// Get files matching patterns and count
+		const allFiles = globbySync(patterns, {
+			cwd: options.path,
+			absolute: true,
+			ignore: options.ignore,
+			dot: true,
+			onlyFiles: true,
+			followSymbolicLinks: false,
+			suppressErrors: true
+		});
+		stats.totalFiles = allFiles.length;
+		debug('Debug - Total files to search:', stats.totalFiles);
+
+		// Start spinner updates with progress
+		updateSpinner = setInterval(() => {
+			const progress = getProgressBar(stats.filesSearched, stats.totalFiles);
+			const currentDir = stats.currentDir ? dim(`\n  📂 ${displayPath(stats.currentDir)}`) : '';
+			spinner.text = `${getLoadingMessage()}\n  ${progress}${options.verbose ? currentDir : ''}`;
+		}, 100);
+
 		let foundMatches = false;
 
-		// Start spinner updates
-		updateSpinner = setInterval(() => {
-			spinner.text = `${getLoadingMessage()} (${stats.filesSearched} files searched)`;
-		}, 2000);
-
+		// Helper function for searching file contents
 		function searchAndDisplayContext(filePath, keywords) {
 			const content = readFileSync(filePath, 'utf-8');
 			const lines = content.split('\n');
@@ -289,28 +316,14 @@ async function search(options) {
 							const matchedText = lineChars.slice(matchStartIdx, matchEndIdx).join('');
 							const afterContext = lineChars.slice(matchEndIdx, contextEnd).join('');
 
-							// Truncate long lines for better readability
-							const maxLineLength = process.stdout.columns || 120;
-							const truncateLength = Math.floor((maxLineLength - 30) / 2); // Leave more room for line numbers, match index, and char index
-
-							const truncateLine = (text) => {
-								if (text.length <= truncateLength) return text;
-								return text.slice(0, truncateLength) + '...';
-							};
-
-							const truncatedBefore = truncateLine(beforeContext);
-							const truncatedMatch = matchedText.length > truncateLength ?
-								matchedText.slice(0, truncateLength) + '...' : matchedText;
-							const truncatedAfter = truncateLine(afterContext);
-
 							// Format: [line@char] content
 							console.log(
 								green(`${lineNum + 1}`) + dim('@') +
 								blue(`${m.index}`) + ' ' +
 								(contextStart > 0 ? '...' : '') +
-								dim(truncatedBefore) +
-								yellow(truncatedMatch) +
-								dim(truncatedAfter) +
+								dim(beforeContext) +
+								yellow(matchedText) +
+								dim(afterContext) +
 								(contextEnd < lineChars.length ? '...' : '')
 							);
 						}
@@ -346,19 +359,7 @@ async function search(options) {
 			return false;
 		}
 
-		// Get files matching patterns
-		const files = globbySync(patterns, {
-			cwd: options.path,
-			absolute: true,
-			ignore: options.ignore,
-			dot: true,
-			onlyFiles: true,
-			followSymbolicLinks: false,  // Don't follow symlinks to avoid permission issues
-			suppressErrors: true         // Skip directories we can't read
-		});
-		debug('Debug - Found files:', files);
-
-		for (const file of files) {
+		for (const file of allFiles) {
 			try {
 				// Check if we can access the file first
 				try {
@@ -372,6 +373,13 @@ async function search(options) {
 						continue;
 					}
 					throw error; // Re-throw other errors
+				}
+
+				// Update current directory for verbose output
+				const dir = path.dirname(file);
+				if (dir !== stats.currentDir) {
+					stats.currentDir = dir;
+					debug(`Searching in: ${displayPath(dir)}`);
 				}
 
 				const stat = statSync(file);
@@ -428,6 +436,7 @@ async function search(options) {
 			console.log(red('\nNo matches found. Maybe try a different search term? 🤔'));
 		}
 
+		// Final stats
 		if (options.stats) {
 			const duration = ((Date.now() - stats.startTime) / 1000).toFixed(2);
 			console.log('\n📊 Search Statistics:');
@@ -442,7 +451,7 @@ async function search(options) {
 		}
 	} catch (error) {
 		spinner.fail(red(`Error: ${error.message}`));
-			process.exit(1);
+		process.exit(1);
 	} finally {
 		if (updateSpinner) clearInterval(updateSpinner);
 		spinner.stop();
