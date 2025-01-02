@@ -262,12 +262,13 @@ async function search(options, keywords) {
 
 				// Find matches for all patterns
 				patterns.forEach(pattern => {
-					const searchRegex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
-					debug(`Using regex: ${searchRegex}`);
+					debug(`Checking pattern: ${pattern}`);
 					lines.forEach((line, index) => {
 						debug(`Checking line ${index + 1}: ${line}`);
-						const matched = searchRegex.test(line);
-						debug(`Line ${index + 1} matched: ${matched}`);
+						// Create a new regex for each test to avoid state issues
+						const searchRegex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
+						const matched = line.match(searchRegex);
+						debug(`Line ${index + 1} matched: ${!!matched}`);
 						if (matched) {
 							debug(`Found match in line ${index + 1}`);
 							if (!matches.has(index)) {
