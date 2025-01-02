@@ -276,8 +276,8 @@ async function search(options) {
 		// Helper function for searching file contents
 		function searchAndDisplayContext(filePath, keywords) {
 			try {
+				debug(`\nSearching file: ${filePath}`);
 				const content = readFileSync(filePath, 'utf-8');
-				debug(`Reading file: ${filePath}`);
 				debug(`Content length: ${content.length}`);
 				debug(`Content (hex):`, Buffer.from(content).toString('hex'));
 				debug(`Content (raw):`, content);
@@ -375,6 +375,7 @@ async function search(options) {
 				}
 			} catch (error) {
 				debug(`Error reading file ${filePath}: ${error.message}`);
+				debug(`Error stack:`, error.stack);
 			}
 			return false;
 		}
