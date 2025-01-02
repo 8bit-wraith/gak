@@ -223,6 +223,7 @@ async function search(options) {
 			options.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
 
 		const keywords = new Set([searchPattern]);
+		let foundMatches = false;
 
 		// Get files matching patterns and count
 		const allFiles = globbySync(patterns, {
@@ -244,117 +245,119 @@ async function search(options) {
 			spinner.text = `${getLoadingMessage()}\n  ${progress}${options.verbose ? currentDir : ''}`;
 		}, 100);
 
-		let foundMatches = false;
-
 		// Helper function for searching file contents
 		function searchAndDisplayContext(filePath, keywords) {
-			const content = readFileSync(filePath, 'utf-8');
-			const lines = content.split('\n');
-			const matches = new Map();
+			try {
+				const content = readFileSync(filePath, 'utf-8');
+				const lines = content.split('\n');
+				const matches = new Map();
 
-			// Find matches for all keywords
-			keywords.forEach(keyword => {
-				const searchRegex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
-				lines.forEach((line, index) => {
-					if (searchRegex.test(line)) {
-						if (!matches.has(index)) {
-							matches.set(index, { line, keywords: new Set() });
+				// Find matches for all keywords
+				keywords.forEach(keyword => {
+					const searchRegex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+					lines.forEach((line, index) => {
+						if (searchRegex.test(line)) {
+							if (!matches.has(index)) {
+								matches.set(index, { line, keywords: new Set() });
+							}
+							matches.get(index).keywords.add(keyword);
 						}
-						matches.get(index).keywords.add(keyword);
-					}
-				});
-			});
-
-			if (matches.size > 0) {
-				if (!options.quiet) {
-					// Show file name with appropriate emoji and normalized path
-					const emoji = getFileEmoji(filePath);
-					console.log(`\n${emoji} ${blue(displayPath(filePath))}`);
-				}
-
-				let matchCount = 0;
-				// Sort matches by line number
-				const sortedMatches = Array.from(matches.entries()).sort(([a], [b]) => a - b);
-
-				for (const [lineNum, match] of sortedMatches) {
-					if (matchCount >= options.maxMatches) break;
-
-					if (options.quiet) {
-						console.log(filePath);
-						matchCount++;
-						continue;
-					}
-
-					// Highlight the matching line
-					let highlightedLine = match.line;
-					match.keywords.forEach(keyword => {
-						const regex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
-						highlightedLine = highlightedLine.replace(regex, yellow('$&'));
 					});
+				});
 
-					// Get context sizes
-					const charsBefore = options.contextBefore || options.context || 0;
-					const charsAfter = options.contextAfter || options.context || 0;
-					const linesBefore = options.linesBefore || options.lines || 0;
-					const linesAfter = options.linesAfter || options.lines || 0;
-
-					if (charsBefore > 0 || charsAfter > 0) {
-						// Character-based context
-						const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.keywords).join('|'), options.caseSensitive ? 'g' : 'gi'))];
-						for (const [matchIndex, m] of matches.entries()) {
-							// Convert string indices to array indices for proper character handling
-							const lineChars = [...highlightedLine];
-							const matchStartIdx = [...highlightedLine.slice(0, m.index)].length;
-							const matchEndIdx = matchStartIdx + [...m[0]].length;
-
-							// Calculate context boundaries
-							const contextStart = Math.max(0, matchStartIdx - charsBefore);
-							const contextEnd = Math.min(lineChars.length, matchEndIdx + charsAfter);
-
-							// Extract and join the context parts
-							const beforeContext = lineChars.slice(contextStart, matchStartIdx).join('');
-							const matchedText = lineChars.slice(matchStartIdx, matchEndIdx).join('');
-							const afterContext = lineChars.slice(matchEndIdx, contextEnd).join('');
-
-							// Format: [line@char] content
-							console.log(
-								green(`${lineNum + 1}`) + dim('@') +
-								blue(`${m.index}`) + ' ' +
-								(contextStart > 0 ? '...' : '') +
-								dim(beforeContext) +
-								yellow(matchedText) +
-								dim(afterContext) +
-								(contextEnd < lineChars.length ? '...' : '')
-							);
-						}
-					} else if (linesBefore > 0 || linesAfter > 0) {
-						// Line-based context
-						const contextBefore = Math.max(0, lineNum - linesBefore);
-						const contextAfter = Math.min(lines.length, lineNum + linesAfter + 1);
-
-						// Print context lines before
-						for (let i = contextBefore; i < lineNum; i++) {
-							console.log(dim(`${i + 1}: ${lines[i]}`));
-						}
-
-						// Print the matching line
-						console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
-
-						// Print context lines after
-						for (let i = lineNum + 1; i < contextAfter; i++) {
-							console.log(dim(`${i + 1}: ${lines[i]}`));
-						}
-					} else {
-						// Just show the matching line
-						console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
+				if (matches.size > 0) {
+					if (!options.quiet) {
+						// Show file name with appropriate emoji and normalized path
+						const emoji = getFileEmoji(filePath);
+						console.log(`\n${emoji} ${blue(displayPath(filePath))}`);
 					}
 
-					console.log(''); // Add spacing between matches
-					matchCount++;
-				}
+					let matchCount = 0;
+					// Sort matches by line number
+					const sortedMatches = Array.from(matches.entries()).sort(([a], [b]) => a - b);
 
-				stats.matchesFound += matches.size;
-				return true;
+					for (const [lineNum, match] of sortedMatches) {
+						if (matchCount >= options.maxMatches) break;
+
+						if (options.quiet) {
+							console.log(filePath);
+							matchCount++;
+							continue;
+						}
+
+						// Highlight the matching line
+						let highlightedLine = match.line;
+						match.keywords.forEach(keyword => {
+							const regex = options.caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+							highlightedLine = highlightedLine.replace(regex, yellow('$&'));
+						});
+
+						// Get context sizes
+						const charsBefore = options.contextBefore || options.context || 0;
+						const charsAfter = options.contextAfter || options.context || 0;
+						const linesBefore = options.linesBefore || options.lines || 0;
+						const linesAfter = options.linesAfter || options.lines || 0;
+
+						if (charsBefore > 0 || charsAfter > 0) {
+							// Character-based context
+							const matches = [...highlightedLine.matchAll(new RegExp(Array.from(match.keywords).join('|'), options.caseSensitive ? 'g' : 'gi'))];
+							for (const [matchIndex, m] of matches.entries()) {
+								// Convert string indices to array indices for proper character handling
+								const lineChars = [...highlightedLine];
+								const matchStartIdx = [...highlightedLine.slice(0, m.index)].length;
+								const matchEndIdx = matchStartIdx + [...m[0]].length;
+
+								// Calculate context boundaries
+								const contextStart = Math.max(0, matchStartIdx - charsBefore);
+								const contextEnd = Math.min(lineChars.length, matchEndIdx + charsAfter);
+
+								// Extract and join the context parts
+								const beforeContext = lineChars.slice(contextStart, matchStartIdx).join('');
+								const matchedText = lineChars.slice(matchStartIdx, matchEndIdx).join('');
+								const afterContext = lineChars.slice(matchEndIdx, contextEnd).join('');
+
+								// Format: [line@char] content
+								console.log(
+									green(`${lineNum + 1}`) + dim('@') +
+									blue(`${m.index}`) + ' ' +
+									(contextStart > 0 ? '...' : '') +
+									dim(beforeContext) +
+									yellow(matchedText) +
+									dim(afterContext) +
+									(contextEnd < lineChars.length ? '...' : '')
+								);
+							}
+						} else if (linesBefore > 0 || linesAfter > 0) {
+							// Line-based context
+							const contextBefore = Math.max(0, lineNum - linesBefore);
+							const contextAfter = Math.min(lines.length, lineNum + linesAfter + 1);
+
+							// Print context lines before
+							for (let i = contextBefore; i < lineNum; i++) {
+								console.log(dim(`${i + 1}: ${lines[i]}`));
+							}
+
+							// Print the matching line
+							console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
+
+							// Print context lines after
+							for (let i = lineNum + 1; i < contextAfter; i++) {
+								console.log(dim(`${i + 1}: ${lines[i]}`));
+							}
+						} else {
+							// Just show the matching line
+							console.log(green(`${lineNum + 1}`) + dim(':') + ' ' + highlightedLine);
+						}
+
+						console.log(''); // Add spacing between matches
+						matchCount++;
+					}
+
+					stats.matchesFound += matches.size;
+					return true;
+				}
+			} catch (error) {
+				debug(`Error reading file ${filePath}: ${error.message}`);
 			}
 			return false;
 		}
