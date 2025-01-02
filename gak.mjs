@@ -93,6 +93,7 @@ program
 	.option('-q, --quiet', 'Only show file names', false)
 	.option('--stats', 'Show search statistics', false)
 	.option('-ss, --show-skips', 'Show skipped files', false)
+	.option('-d, --debug', 'Show debug information', false)
 	.version('1.0.0')
 	.showHelpAfterError();
 
@@ -129,6 +130,13 @@ if (!sizeLimit) {
 const multipliers = { k: 1024, m: 1024 * 1024, g: 1024 * 1024 * 1024 };
 const bytes = parseInt(sizeLimit[1]) * (sizeLimit[2] ? multipliers[sizeLimit[2].toLowerCase()] : 1);
 
+// Helper function for debug logging
+function debug(...args) {
+	if (options.debug) {
+		console.error(...args);
+	}
+}
+
 // Build glob patterns based on file extensions
 let patterns = ['**/*'];
 if (options.type) {
@@ -140,8 +148,8 @@ if (options.type) {
 	
 	if (extensions.length > 0) {
 		patterns = extensions.map(ext => `**/*.${ext}`);
-		console.error('Debug - File patterns:', patterns);
-		console.error('Debug - Extensions:', extensions);
+		debug('Debug - File patterns:', patterns);
+		debug('Debug - Extensions:', extensions);
 	}
 }
 
@@ -341,7 +349,7 @@ async function search(options) {
 			ignore: options.ignore,
 			dot: true
 		});
-		console.error('Debug - Found files:', files);
+		debug('Debug - Found files:', files);
 
 		for (const file of files) {
 			try {

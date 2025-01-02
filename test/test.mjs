@@ -23,7 +23,7 @@ console.log('🧪 Running GAK tests...\n');
 // Test helper function
 function runGak(args) {
     try {
-        return execSync(`node ${gakPath} ${args}`, { encoding: 'utf8' });
+        return execSync(`node ${gakPath} -d ${args}`, { encoding: 'utf8' });
     } catch (error) {
         return error.stdout;
     }
