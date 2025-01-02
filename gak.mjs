@@ -144,17 +144,10 @@ function debug(...args) {
 // Build glob patterns based on file extensions
 let patterns = ['**/*'];
 if (options.type) {
-	// Split comma-separated extensions and handle both formats (.js and js)
-	const extensions = options.type.split(',')
-		.filter(ext => ext.trim())  // Remove empty entries
+	const extensions = options.type.toString().split(',')
 		.map(ext => ext.trim())
-		.map(ext => ext.startsWith('.') ? ext.slice(1) : ext);
-	
-	if (extensions.length > 0) {
-		patterns = extensions.map(ext => `**/*.${ext}`);
-		debug('Debug - File patterns:', patterns);
-		debug('Debug - Extensions:', extensions);
-	}
+		.map(ext => ext.startsWith('.') ? ext : `.${ext}`);
+	patterns = extensions.map(ext => `**/*${ext}`);
 }
 
 // Update file path display for current OS
@@ -191,7 +184,15 @@ function getProgressBar(current, total, width = 20) {
 }
 
 // Main search function
-async function search(options, keywords) {
+async function search(options) {
+	const {
+		pattern,
+		caseSensitive = false,
+		charsBefore = 0,
+		charsAfter = 0,
+		fileTypes = null,
+	} = options;
+
 	const spinner = ora({
 		text: getLoadingMessage(),
 		spinner: 'dots12',
@@ -216,15 +217,15 @@ async function search(options, keywords) {
 	let updateSpinner;
 
 	try {
-		// Convert keywords to RegExp safely, escaping special chars if they're not already regexes
-		const searchPatterns = keywords.map(keyword => {
-			const isRegex = keyword.startsWith('/') && keyword.endsWith('/');
-			return isRegex ?
-				keyword.slice(1, -1) : // Remove the slashes for actual regex
-				keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
-		});
+		// Convert pattern to RegExp safely, escaping special chars if it's not already a regex
+		const isRegex = pattern.startsWith('/') && pattern.endsWith('/');
+		const searchPattern = isRegex ?
+			pattern.slice(1, -1) : // Remove the slashes for actual regex
+			pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special chars for literal search
 
-		debug('Search patterns:', searchPatterns);
+		const keywords = new Set([searchPattern]);
+		debug('Search pattern:', searchPattern);
+		debug('Keywords:', Array.from(keywords));
 
 		// Get files matching patterns and count
 		const allFiles = globbySync(patterns, {
@@ -250,14 +251,14 @@ async function search(options, keywords) {
 		let foundMatches = false;
 
 		// Helper function for searching file contents
-		function searchAndDisplayContext(filePath, patterns) {
+		function searchAndDisplayContext(filePath, keywords) {
 			try {
 				const content = readFileSync(filePath, 'utf-8');
 				debug(`Reading file: ${filePath}`);
 				debug(`Content length: ${content.length}`);
 				debug(`Content (hex):`, Buffer.from(content).toString('hex'));
 				debug(`Content (raw):`, content);
-				debug(`Patterns: ${patterns}`);
+				debug(`Keywords:`, Array.from(keywords));
 				
 				const lines = content.split('\n');
 				debug(`Lines: ${lines.length}`);
@@ -268,26 +269,24 @@ async function search(options, keywords) {
 				
 				const matches = new Map();
 
-				// Find matches for all patterns
-				for (let i = 0; i < lines.length; i++) {
-					const line = lines[i];
-					debug(`\nChecking line ${i + 1}: ${JSON.stringify(line)}`);
+				// Find matches for all keywords
+				for (const keyword of keywords) {
+					debug(`\nChecking keyword: ${JSON.stringify(keyword)}`);
+					const searchRegex = caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
+					debug(`Using regex: ${searchRegex}`);
 
-					// Check each pattern against the line
-					for (const pattern of patterns) {
-						debug(`Checking pattern: ${JSON.stringify(pattern)}`);
-						const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
-						debug(`Using regex: ${regex}`);
-						const matched = line.match(regex);
+					lines.forEach((line, index) => {
+						debug(`Checking line ${index + 1}: ${JSON.stringify(line)}`);
+						const matched = line.match(searchRegex);
 						debug(`Match result: ${matched ? JSON.stringify(matched) : 'null'}`);
 						if (matched) {
-							debug(`Found match in line ${i + 1}`);
-							if (!matches.has(i)) {
-								matches.set(i, { line, patterns: new Set() });
+							debug(`Found match in line ${index + 1}`);
+							if (!matches.has(index)) {
+								matches.set(index, { line, keywords: new Set() });
 							}
-							matches.get(i).patterns.add(pattern);
+							matches.get(index).keywords.add(keyword);
 						}
-					}
+					});
 				}
 
 				if (matches.size > 0) {
@@ -313,8 +312,8 @@ async function search(options, keywords) {
 
 						// Highlight the matching line
 						let highlightedLine = match.line;
-						match.patterns.forEach(pattern => {
-							const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
+						match.keywords.forEach(keyword => {
+							const regex = caseSensitive ? new RegExp(keyword, 'g') : new RegExp(keyword, 'gi');
 							highlightedLine = highlightedLine.replace(regex, yellow('$&'));
 						});
 
@@ -411,8 +410,8 @@ async function search(options, keywords) {
 
 				stats.filesSearched++;
 
-				// Search for all patterns in the file
-				if (searchAndDisplayContext(file, searchPatterns)) {
+				// Search for all keywords in the file
+				if (searchAndDisplayContext(file, keywords)) {
 					foundMatches = true;
 				}
 			} catch (error) {
@@ -459,9 +458,27 @@ async function search(options, keywords) {
 // Run the search
 const start = performance.now();
 search({
-	...options,
-	pattern: keywords.join(' ')
-}, keywords).then(() => {
+	pattern: keywords.join(' '),
+	caseSensitive: options.caseSensitive,
+	charsBefore: options.contextBefore || options.context || 0,
+	charsAfter: options.contextAfter || options.context || 0,
+	fileTypes: options.type,
+	path: options.path,
+	binary: options.binary,
+	ignore: options.ignore,
+	maxMatches: options.maxMatches,
+	quiet: options.quiet,
+	stats: options.stats,
+	contextBefore: options.contextBefore,
+	contextAfter: options.contextAfter,
+	context: options.context,
+	linesBefore: options.linesBefore,
+	linesAfter: options.linesAfter,
+	lines: options.lines,
+	showSkips: options.showSkips,
+	debug: options.debug,
+	verbose: options.verbose
+}).then(() => {
 	if (!options.quiet && !options.json) {
 		const end = performance.now();
 		console.log(dim(`\nSearch completed in ${(end - start).toFixed(2)}ms`));
