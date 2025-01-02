@@ -131,9 +131,12 @@ const bytes = parseInt(sizeLimit[1]) * (sizeLimit[2] ? multipliers[sizeLimit[2].
 
 // Build glob patterns based on file extensions
 let patterns = ['**/*'];
-if (options.type.length) {
-	const extensions = options.type.join(',').split(',').map(ext => ext.startsWith('.') ? ext : `.${ext}`);
-	patterns = extensions.map(ext => `**/*${ext}`);
+if (options.type && options.type.length) {
+	// Split comma-separated extensions and handle both formats (.js and js)
+	const extensions = options.type.toString().split(',')
+		.map(ext => ext.trim())
+		.map(ext => ext.startsWith('.') ? ext.slice(1) : ext);
+	patterns = extensions.map(ext => `**/*.${ext}`);
 }
 
 // Update file path display for current OS
