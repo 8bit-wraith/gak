@@ -255,23 +255,27 @@ async function search(options, keywords) {
 				const content = readFileSync(filePath, 'utf-8');
 				debug(`Reading file: ${filePath}`);
 				debug(`Content length: ${content.length}`);
-				debug(`Content: ${content}`);
+				debug(`Content (hex):`, Buffer.from(content).toString('hex'));
+				debug(`Content (raw):`, content);
 				debug(`Patterns: ${patterns}`);
 				
 				const lines = content.split('\n');
 				debug(`Lines: ${lines.length}`);
-				lines.forEach((line, i) => debug(`Line ${i + 1}: "${line}"`));
+				lines.forEach((line, i) => {
+					debug(`Line ${i + 1} (length: ${line.length}):`, JSON.stringify(line));
+					debug(`Line ${i + 1} (hex):`, Buffer.from(line).toString('hex'));
+				});
 				
 				const matches = new Map();
 
 				// Find matches for all patterns
 				for (let i = 0; i < lines.length; i++) {
 					const line = lines[i];
-					debug(`\nChecking line ${i + 1}: "${line}"`);
+					debug(`\nChecking line ${i + 1}: ${JSON.stringify(line)}`);
 
 					// Check each pattern against the line
 					for (const pattern of patterns) {
-						debug(`Checking pattern: "${pattern}"`);
+						debug(`Checking pattern: ${JSON.stringify(pattern)}`);
 						const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
 						debug(`Using regex: ${regex}`);
 						const matched = line.match(regex);
