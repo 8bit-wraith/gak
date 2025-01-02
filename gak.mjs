@@ -137,7 +137,7 @@ const bytes = parseInt(sizeLimit[1]) * (sizeLimit[2] ? multipliers[sizeLimit[2].
 // Helper function for debug logging
 function debug(...args) {
 	if (options.debug) {
-		console.error(...args);
+		console.error('DEBUG:', ...args);
 	}
 }
 
@@ -192,6 +192,29 @@ async function search(options) {
 		charsAfter = 0,
 		fileTypes = null,
 	} = options;
+
+	debug('Search options:', {
+		pattern,
+		caseSensitive,
+		charsBefore,
+		charsAfter,
+		fileTypes,
+		path: options.path,
+		binary: options.binary,
+		ignore: options.ignore,
+		maxMatches: options.maxMatches,
+		quiet: options.quiet,
+		stats: options.stats,
+		contextBefore: options.contextBefore,
+		contextAfter: options.contextAfter,
+		context: options.context,
+		linesBefore: options.linesBefore,
+		linesAfter: options.linesAfter,
+		lines: options.lines,
+		showSkips: options.showSkips,
+		debug: options.debug,
+		verbose: options.verbose
+	});
 
 	const spinner = ora({
 		text: getLoadingMessage(),
