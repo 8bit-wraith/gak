@@ -261,23 +261,23 @@ async function search(options, keywords) {
 				const matches = new Map();
 
 				// Find matches for all patterns
-				patterns.forEach(pattern => {
-					debug(`Checking pattern: ${pattern}`);
-					lines.forEach((line, index) => {
-						debug(`Checking line ${index + 1}: ${line}`);
-						// Create a new regex for each test to avoid state issues
-						const searchRegex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
-						const matched = line.match(searchRegex);
-						debug(`Line ${index + 1} matched: ${!!matched}`);
-						if (matched) {
-							debug(`Found match in line ${index + 1}`);
-							if (!matches.has(index)) {
-								matches.set(index, { line, patterns: new Set() });
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i];
+					debug(`Checking line ${i + 1}: ${line}`);
+
+					// Check each pattern against the line
+					for (const pattern of patterns) {
+						debug(`Checking pattern: ${pattern}`);
+						const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
+						if (line.match(regex)) {
+							debug(`Found match in line ${i + 1}`);
+							if (!matches.has(i)) {
+								matches.set(i, { line, patterns: new Set() });
 							}
-							matches.get(index).patterns.add(pattern);
+							matches.get(i).patterns.add(pattern);
 						}
-					});
-				});
+					}
+				}
 
 				if (matches.size > 0) {
 					debug(`Found ${matches.size} matches in ${filePath}`);
