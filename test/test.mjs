@@ -23,15 +23,20 @@ console.log('🧪 Running GAK tests...\n');
 // Test helper function
 function runGak(args) {
     try {
-        return execSync(`node ${gakPath} -d ${args}`, { encoding: 'utf8' });
+        const cmd = `node ${gakPath} -d ${args}`;
+        console.error(`Running command: ${cmd}`);
+        const result = execSync(cmd, { encoding: 'utf8' });
+        console.error(`Command output: ${result}`);
+        return result;
     } catch (error) {
+        console.error(`Command error: ${error.message}`);
         return error.stdout;
     }
 }
 
 // Test basic search
 console.log('📝 Testing basic search...');
-const basicResult = runGak('-p test/fixtures test');
+const basicResult = runGak(`-p ${fixturesPath} test`);
 assert(basicResult.includes('test1.txt'), 'Should find test in test1.txt');
 assert(basicResult.includes('test2.js'), 'Should find test in test2.js');
 console.log('✅ Basic search test passed!\n');
