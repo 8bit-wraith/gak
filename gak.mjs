@@ -255,21 +255,28 @@ async function search(options, keywords) {
 				const content = readFileSync(filePath, 'utf-8');
 				debug(`Reading file: ${filePath}`);
 				debug(`Content length: ${content.length}`);
+				debug(`Content: ${content}`);
 				debug(`Patterns: ${patterns}`);
 				
 				const lines = content.split('\n');
+				debug(`Lines: ${lines.length}`);
+				lines.forEach((line, i) => debug(`Line ${i + 1}: "${line}"`));
+				
 				const matches = new Map();
 
 				// Find matches for all patterns
 				for (let i = 0; i < lines.length; i++) {
 					const line = lines[i];
-					debug(`Checking line ${i + 1}: ${line}`);
+					debug(`\nChecking line ${i + 1}: "${line}"`);
 
 					// Check each pattern against the line
 					for (const pattern of patterns) {
-						debug(`Checking pattern: ${pattern}`);
+						debug(`Checking pattern: "${pattern}"`);
 						const regex = options.caseSensitive ? new RegExp(pattern, 'g') : new RegExp(pattern, 'gi');
-						if (line.match(regex)) {
+						debug(`Using regex: ${regex}`);
+						const matched = line.match(regex);
+						debug(`Match result: ${matched ? JSON.stringify(matched) : 'null'}`);
+						if (matched) {
 							debug(`Found match in line ${i + 1}`);
 							if (!matches.has(i)) {
 								matches.set(i, { line, patterns: new Set() });
