@@ -43,26 +43,26 @@ console.log('✅ Basic search test passed!\n');
 
 // Test file type filtering
 console.log('🔍 Testing file type filtering...');
-const jsResult = runGak('-p test/fixtures -t js test');
+const jsResult = runGak(`-p ${fixturesPath} -t js test`);
 assert(jsResult.includes('test2.js'), 'Should find test in JS files');
 assert(!jsResult.includes('test1.txt'), 'Should not find test in TXT files when filtering for JS');
 console.log('✅ File type filtering test passed!\n');
 
 // Test binary file handling
 console.log('💾 Testing binary file handling...');
-const binaryResult = runGak('-p test/fixtures test');
+const binaryResult = runGak(`-p ${fixturesPath} test`);
 assert(!binaryResult.includes('binary.bin'), 'Should skip binary files by default');
 console.log('✅ Binary file handling test passed!\n');
 
 // Test case sensitivity
 console.log('🔤 Testing case sensitivity...');
-const caseResult = runGak('-p test/fixtures -C TEST');
+const caseResult = runGak(`-p ${fixturesPath} -C TEST`);
 assert(!caseResult.includes('test1.txt'), 'Should not find lowercase when searching uppercase with -C');
 console.log('✅ Case sensitivity test passed!\n');
 
 // Test context display
 console.log('📖 Testing context display...');
-const contextResult = runGak('-p test/fixtures -l 1 test');
+const contextResult = runGak(`-p ${fixturesPath} -l 1 test`);
 assert(contextResult.includes('multiple lines'), 'Should show context lines');
 console.log('✅ Context display test passed!\n');
 
