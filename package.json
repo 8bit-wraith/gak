@@ -8,9 +8,14 @@
   },
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test/test.mjs",
     "prepublishOnly": "chmod +x gak.mjs",
-    "postinstall": "node -e \"if (process.platform !== 'win32') { const {chmod} = require('fs'); chmod('gak.mjs', '755', ()=>{}); }\""
+    "postinstall": "node -e \"if (process.platform !== 'win32') { const {chmod} = require('fs'); chmod('gak.mjs', '755', ()=>{}); }\"",
+    "dev:link": "npm link",
+    "dev:unlink": "npm unlink",
+    "dev:test": "node gak.mjs -p test/fixtures 'test'",
+    "setup": "npm install && npm run dev:link",
+    "clean": "npm run dev:unlink && rm -rf node_modules"
   },
   "keywords": [
     "search",
