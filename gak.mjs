@@ -382,10 +382,14 @@ async function search(options) {
 
 		for (const file of allFiles) {
 			try {
+				debug(`\nProcessing file: ${file}`);
 				// Check if we can access the file first
 				try {
+					debug(`Checking file access: ${file}`);
 					await fs.access(file, fs.constants.R_OK);
+					debug(`File access granted: ${file}`);
 				} catch (error) {
+					debug(`File access error: ${error.message}`);
 					if (error.code === 'EACCES' || error.code === 'EPERM') {
 						stats.filesSkipped.permission++;
 						if (options.showSkips) {
@@ -403,7 +407,14 @@ async function search(options) {
 					debug(`Searching in: ${displayPath(dir)}`);
 				}
 
+				debug(`Getting file stats: ${file}`);
 				const stat = statSync(file);
+				debug(`File stats:`, {
+					size: stat.size,
+					isDirectory: stat.isDirectory(),
+					isFile: stat.isFile(),
+					mode: stat.mode.toString(8)
+				});
 
 				// Skip if it's a directory
 				if (stat.isDirectory()) {
@@ -424,7 +435,9 @@ async function search(options) {
 				}
 
 				// Skip binary files unless explicitly included
-				if (!options.binary && !isTextPath(file)) {
+				const isText = isTextPath(file);
+				debug(`File type check: ${file} - isText: ${isText}`);
+				if (!options.binary && !isText) {
 					stats.filesSkipped.binary++;
 					if (options.showSkips) {
 						debug(`Skipping binary file: ${file}`);
@@ -433,12 +446,15 @@ async function search(options) {
 				}
 
 				stats.filesSearched++;
+				debug(`Searching file contents: ${file}`);
 
 				// Search for all keywords in the file
 				if (searchAndDisplayContext(file, keywords)) {
-					foundMatches = true;
+						foundMatches = true;
 				}
 			} catch (error) {
+				debug(`Error processing file ${file}:`, error);
+				debug(`Error stack:`, error.stack);
 				stats.filesSkipped.error++;
 				if (options.showSkips) {
 					if (error.code === 'ENOENT') {
